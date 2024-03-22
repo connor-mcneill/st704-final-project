@@ -15,6 +15,7 @@
 \usepackage[hidelinks, colorlinks=true]{hyperref}
 \usepackage{tikz}
 \usepackage{float}
+\usepackage{hyperref}
 
 
 %SetFonts
@@ -51,9 +52,25 @@
 
 \subsection*{Data Overview}
 
+Our dataset is a conglomeration of resources related to college \textit{tuition}, \textit{diversity}, and potential \textit{salary} after graduation across the United States over a 30-year period. The data\footnote[1]{\url{https://www.kaggle.com/datasets/jessemostipak/college-tuition-diversity-and-pay/data}} come from a number of resources including the \textbf{National Center for Education Statistics}. Per university, the following metrics are recorded:
+\begin{enumerate}
+    \item Tuition, fees, and academic information (e.g., private/public institution, location)
+    \item Diversity metrics (demographic statistics)
+    \item Cost to students
+    \item Graduation rates and salary data
+\end{enumerate}
+With almost $\$2$ trillion in student-loan debt across all debt-holders in the United States\footnote[2]{\url{https://www.forbes.com/advisor/student-loans/average-student-loan-debt-statistics/}}, it is no secret that the cost of college is a burden on many American families. As more students apply to college, and with recent judicial results related to Affirmative Action legislature, understanding the shifting landscape of post-secondary education in the United States becomes quite the interesting pursuit. It is the focus of this project to analyze what factors make students of certain universities successful and how college education across America can be enhanced.
+
 \subsection*{Research Question}
 
-\textbf{}
+Our primary research question is
+\begin{quote}
+    How do tuition and socioeconomic factors impact success post-graduation?
+\end{quote}
+
+With this, we hope to explore the relationship between predictors such as tuition, the type of school (private vs public), first-year retention rates, and socioeconomic factors such as percentage of students from underrepresented populations, family income, and the amount of grant/aid being provided to students. Success indicators to be explored may include graduation rates and income post-graduation and mid-career.
+
+We will explore and consider multiple methods as part of this project. Models we are considering include multiple linear regression, penalized regression, nonlinear regression, and generalized linear models such as logistic regression. Our plan for the more advanced model is to explore utilizing a Bayesian Logistic Regression model, but we may modify the type of model considered in the Bayesian context based on what success indicators we choose to consider.
 
 \section{Project Timeline}
 
@@ -76,14 +93,12 @@ Presentation & 4/19 & 4/21 \\
 
 \section{Description of Group Responsibilities}
 
-The following is a quasi-breakdown of the responsibilities of each group member, taking into account perceived individual strengths. By no means is this a strict partition of the project duties, as we \textit{all} are [environmental] statisticians and should therefore be `experts' in the aforementioned responsibilities.
+The following is a quasi-breakdown of the responsibilities of each group member, taking into account perceived individual strengths. By no means is this a strict partition of the project duties, as we \textit{all} are statisticians and should therefore be `experts' in the aforementioned responsibilities.
 
 \begin{enumerate}
-    \item \textbf{Carter}:  
-    \item \textbf{Connor}:
-    \item \textbf{Miles}:
+    \item \textbf{Carter}: Implementing models (including the Bayesian method as needed), quality control of codebase, assistance on exploratory data analysis and writeup.
+    \item \textbf{Connor}: Data cleaning, implementation of Bayesian method, presentation preparation, assistance on writeup and analysis
+    \item \textbf{Miles}: EDA, model implementation (for the remaining models), assistance on presentation preparation.
 \end{enumerate}
-
-\section{References}
 
 \end{document}
