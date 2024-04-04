@@ -92,4 +92,28 @@ for (i in 1:length(updated.names$right)) {
 names.match = data.frame(original = salary_potential_2$name,
                          matched = character(length(salary_potential_2$name)))
 
-save.image("work_apr_3.RData")
+for (i in 1:length(names.match$original)) {
+  name = names.match$original[i]
+  if (name %in% updated.names$right) {
+    name = updated.names$old[which(name == updated.names$right)]
+  }
+  names.match$matched[i] = name
+}
+
+salary_potential_merged %>% 
+
+salary_potential_merged = inner_join(salary_potential_2, names.match,
+                                     by=c("name" = "original"), relationship = "many-to-many")
+salary_potential_mergeda = inner_join(salary_potential_merged, states.abbr,
+                                      by = c("state_name" = "state"))
+updated_salary_potential = salary_potential_mergeda %>% distinct()
+salarypotscore = inner_join(updated_salary_potential, scorecard_data,
+                              by=c("matched" = "name", "state_code" = "state_abbr"))
+final.data = inner_join(tuitioncost_diversity, salarypotscore,
+                        by=c("name" = "name", "state" = "state_name"))
+final.date.wide = final.data %>% pivot_wider(names_from = 'category',
+                                  values_from = 'enrollment')
+final.dataset = final.date.wide
+save.image("work_apr4.RData")
+save(final.dataset, file="data/college_data.RData")
+write_csv(final.dataset, file="data/college_data_cleaned.csv")                                  
