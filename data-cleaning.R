@@ -51,8 +51,7 @@ for (i in 1:dim(salary_potential)[1]) {
       print("Enter name: ")
       salary_potential_2[i,2] = readline()
     }
-    which(salary_potential_2$name == "Linfield College")
-  }salary_potential_2$name[681] = "Linfield College - Adult"
+  }
 }
 
 salary_potential_2$name[681] = "Linfield College - Adult"
@@ -62,3 +61,35 @@ dataset_1 <- dplyr::inner_join(tuitioncost_diversity, salary_potential_2,
                               by=c("name" = "name", "state" = "state_name"))
 save(dataset_1, file="data/dataset_1.RData")
 save(salary_potential_2, file="data/salary_potential_fixed.RData")
+load("data/salary_potential_fixed.RData")
+
+scorecard_data <- read_csv("data/Most-Recent-Cohorts-Institution.csv")
+
+final_data <- inner_join(dataset_1, scorecard_data,
+                         by = c("name" = "name", "state_code" = "state_abbr"))
+missing_names2 <- setdiff(unique(dataset_1$name), unique(final_data$name))
+
+states.abbr <- tuition_cost %>% select(state, state_code) %>% unique()
+
+updated.names <- data.frame(right = missing_names2,
+                            old = character(length(missing_names2)))
+# Take the name that is missing
+for (i in 1:length(updated.names$right)) {
+  right.name = updated.names$right[i]
+  potential.match = scorecard_data$name[amatch(right.name, scorecard_data$name,
+                                               maxDist = Inf)] 
+  print(paste0(potential.match, " = ", right.name, "? (y/n)"))
+  input = tolower(readline())
+  if (input == 'y') {
+    updated.names$old[i] = potential.match
+  } else {
+    print("Enter name: ")
+    updated.names$old[i] = readline()
+  }
+}
+
+
+names.match = data.frame(original = salary_potential_2$name,
+                         matched = character(length(salary_potential_2$name)))
+
+save.image("work_apr_3.RData")
