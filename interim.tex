@@ -1,0 +1,53 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{a4paper, left=2cm, right=2cm, top=1.5cm, bottom=3cm }
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{natbib}
+
+\usepackage{etoolbox,fancyhdr,xcolor}
+\newcommand{\headrulecolor}[1]{\patchcmd{\headrule}{\hrule}{\color{#1}\hrule}{}{}}
+\newcommand{\footrulecolor}[1]{\patchcmd{\footrule}{\hrule}{\color{#1}\hrule}{}{}}
+\renewcommand{\headrulewidth}{1pt}
+\headrulecolor{red!100}%
+\renewcommand{\footrulewidth}{1pt}
+\footrulecolor{red!100}%
+
+\fancyhf{}
+\fancyhead[R]{\includegraphics[width=0.25\textwidth]{NCSUImage.png}}
+
+\fancyfoot[L]{ST 704 Final Project}
+\fancyfoot[C]{Department of Statistics}
+\fancyfoot[R]{\thepage}
+
+\setlength{\headheight}{15mm}
+\pagestyle{fancy}
+
+\bibliographystyle{apalike}
+
+\usepackage{times}
+\begin{document}
+
+\noindent 
+\begin{center}
+\textbf{{\Large ST 704 Final Project Interim Report}} \\
+\end{center}
+
+\noindent 
+\textbf{Carter Hall, Connor McNeill, Miles Woollacott} \textit{North Carolina State University}
+\\
+
+\noindent
+This report is a quick overview of the work that has been completed, as well as where the group plans to apply these efforts.
+\begin{enumerate}
+    \item \textbf{Data Cleaning}: With multiple data sources within the repository we identified as our dataset for this project, a natural step before conducting any analysis and/or modeling is to clean and preprocess the data. 
+
+    This task has proved arduous with thousands of school names across the United States, hundreds of which have alternative names, have \textit{changed} names, or have different naming conventions between the two datasets. This has culminated in a laborious effort to identify and \textit{hand-change} school names so that joining the datasets together introduces no unnecessary rows (i.e., NA values).  
+    \item \textbf{Exploratory Data Analysis}: Given that we could identify \textit{multiple} response variables to model in explaining our research question, our EDA has been targeted at familiarizing ourselves with the data and identifying surprising [linear] associations. 
+    \item \textbf{Identification of New Modeling Techniques}: Rather than simply \textit{re}-applying regression techniques from a Bayesian paradigm, we floated the possibility of tree-based methods (e.g., \textbf{Bayesian Additive Regression Trees} (BART), classification/regression trees, etc.) as a new modeling technique. Once the data cleaning is \textit{complete} (which it would be at the deadline of this report), group discussions will certainly pin down which of these techniques is finalized. \textit{The working plan for modeling is to fit a plethora of models and identify those which are performative, parsimonous, and as interpretable as possible}! 
+\end{enumerate}
+\end{document}
