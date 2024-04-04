@@ -1,0 +1,39 @@
+---
+title: "EDA"
+output: pdf_document
+---
+
+# Load Packages and Data
+
+```{r, warning=F, message=F}
+require(PerformanceAnalytics)
+require(corrplot)
+require(tidyverse)
+```
+
+```{r}
+load("data/dataset_1.RData")
+college.data<-dataset_1
+college.data$type<-as.factor(college.data$type)
+college.data$degree_length<-as.factor(college.data$degree_length)
+```
+
+# EDA
+
+```{r}
+college.data.no_na<-na.omit(college.data)
+
+college.data.no_na$prop<-college.data.no_na$enrollment/college.data.no_na$total_enrollment
+
+college.data.no_category<-college.data.no_na[,c(1:11, 14:19)]
+college.data.unique<-college.data.no_category[!duplicated(college.data.no_category),]
+
+for(i in unique(college.data.no_na$category)){
+  string<-paste("prop", i, sep="")
+  college.data.unique[string]<-college.data.no_na[college.data.no_na$category==i,c("prop")]
+}
+
+#chart.Correlation(college.data.unique[,c(6:27)], histogram=T, method="pearson")
+corrplot::corrplot(cor(college.data.unique[,c(6:27)]), diag=F, type="lower", tl.cex=0.64)
+```
+
