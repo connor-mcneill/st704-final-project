@@ -51,4 +51,16 @@ This report is a quick overview of the work that has been completed, as well as 
     \item \textbf{Identification of New Modeling Techniques}: Rather than simply \textit{re}-applying regression techniques from a Bayesian paradigm, we floated the possibility of tree-based methods (e.g., \textbf{Bayesian Additive Regression Trees} (BART), classification/regression trees, etc.) as a new modeling technique. Once the data cleaning is \textit{complete} (which it would be at the deadline of this report), group discussions will certainly pin down which of these techniques is finalized. Separately, \textit{regression splines} were an idea we hypothesized, including methods like \textbf{Multivariate additive regression spline} (MARS). \textit{The working plan for modeling is to fit a plethora of models and identify those which are performative, parsimonous, and as interpretable as possible}! 
 \end{enumerate}
 We hypothesize exploring questions related to \textit{graduation rate} (variable name \textit{PooledC150}) and early/mid/late career pay.
+\\
+
+\noindent
+As for efforts made in the modeling sphere, the following has been completed thus far:
+\begin{enumerate}
+    \item Some predictors, post-data-cleaning (i.e., joining our data sources together) were coerced to data types suitable for their values (e.g., factor if categorical, numeric if otherwise).
+    \item Identifying that the \textbf{Gamma} and/or \textbf{Inverse Gaussian} GLMs might be of-interest, as having \textbf{financial response variables} lends itself to considering the Gamma distribution, and that Faraway juxtaposes the Gamma with the Inverse Gaussian in Chapter 7 of his text. (For \textit{graduation rate} and \textit{admission rate}, among others, a Beta GLM is similarly warranted.) 
+    \begin{enumerate}
+        \item Variable selection, thus far, has been somewhat difficult; stepwise regression for the Inverse Gaussian GLM (even after a \textit{log-transformation} of the response) with AIC as a criterion yielded models that analysis-of-deviance tests failed to conclude as significant improvements over a full model (i.e., preference of the reduced model). \textbf{Possible solution}: Do external research to identify historically significant predictors to trim the pool of potential predictors towards a more parsimonious model.
+    \end{enumerate}
+\end{enumerate}
+From initial efforts, it appears that \textbf{dimension reduction} will be pivotal in creating a powerful model; penalized regression techniques have yet to be explored at the time of writing this Interim Report, although consideration will certainly be given to models such as the LASSO.
 \end{document}
