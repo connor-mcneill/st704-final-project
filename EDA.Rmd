@@ -87,7 +87,7 @@ corrplot::corrplot(corr.extreme, diag=F, type="lower", tl.cex=0.72)
 
 ```{r}
 college.class<-sapply(college.data.no_na, class)
-num.cols<-college.class=="factor"
+num.cols<-college.class%in%c("factor", "logical")
 for(i in colnames(college.data.no_na)[num.cols]){
   par(mfrow=c(1, 3))
   boxplot(college.data.no_na$C150_POOLED~droplevels(college.data.no_na[,i]),
