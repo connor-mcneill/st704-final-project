@@ -11,29 +11,92 @@ require(corrplot)
 require(tidyverse)
 ```
 
-```{r}
-load("data/dataset_1.RData")
-college.data<-dataset_1
+# Read Data / Make Variables Factors
+
+```{r, warning=F}
+## Read in Data
+college.data<-read.csv("data/college_data_cleaned.csv")
+college.data<-college.data[,-ncol(college.data)]
+
+## Categorical Data
 college.data$type<-as.factor(college.data$type)
 college.data$degree_length<-as.factor(college.data$degree_length)
+college.data$hbcu<-as.factor(college.data$hbcu)
+college.data$pbi<-as.factor(college.data$pbi)
+college.data$annhi<-as.factor(college.data$annhi)
+college.data$tribal<-as.factor(college.data$tribal)
+college.data$AANAPII<-as.factor(college.data$AANAPII)
+college.data$his<-as.factor(college.data$his)
+college.data$nanti<-as.factor(college.data$nanti)
+college.data$men_only<-as.factor(college.data$men_only)
+college.data$women_only<-as.factor(college.data$women_only)
+college.data$distance_only<-as.factor(college.data$distance_only)
+
+## Numeric Data (NA warnings suppressed)
+college.data$LOCALE<-as.numeric(college.data$LOCALE)
+college.data$admission_rate<-as.numeric(college.data$admission_rate)
+college.data$sat_avg<-as.numeric(college.data$sat_avg)
+college.data$netprice_lowincome<-as.numeric(college.data$netprice_lowincome)
+college.data$tuit_fte<-as.numeric(college.data$tuit_fte)
+college.data$inexp_fte<-as.numeric(college.data$inexp_fte)
+college.data$avg_fac_salary<-as.numeric(college.data$avg_fac_salary)
+college.data$pct_ft_fac<-as.numeric(college.data$pct_ft_fac)
+college.data$pct_pell<-as.numeric(college.data$pct_pell)
+college.data$C150_POOLED<-as.numeric(college.data$C150_POOLED)
+college.data$age_entry<-as.numeric(college.data$age_entry)
+college.data$first_gen<-as.numeric(college.data$first_gen)
+college.data$med_fam_inc<-as.numeric(college.data$med_fam_inc)
+college.data$pct_grad_degree<-as.numeric(college.data$pct_grad_degree)
+college.data$pct_domestic<-as.numeric(college.data$pct_domestic)
+college.data$median_hh_income<-as.numeric(college.data$median_hh_income)
+college.data$poverty_rate<-as.numeric(college.data$poverty_rate)
+college.data$unemployment_rate<-as.numeric(college.data$unemployment_rate)
 ```
 
 # EDA
 
+## Numeric Data (Correlation Matrix)
+
 ```{r}
+## Drop NA Rows
 college.data.no_na<-na.omit(college.data)
 
-college.data.no_na$prop<-college.data.no_na$enrollment/college.data.no_na$total_enrollment
-
-college.data.no_category<-college.data.no_na[,c(1:11, 14:19)]
-college.data.unique<-college.data.no_category[!duplicated(college.data.no_category),]
-
-for(i in unique(college.data.no_na$category)){
+## Get Percent per Category
+category<-c("Women", "American.Indian...Alaska.Native", "Asian", "Black",
+            "Hispanic", "Native.Hawaiian...Pacific.Islander", "White",
+            "Two.Or.More.Races", "Unknown", "Non.Resident.Foreign", "Total.Minority")
+for(i in category){
   string<-paste("prop", i, sep="")
-  college.data.unique[string]<-college.data.no_na[college.data.no_na$category==i,c("prop")]
+  college.data.no_na[string]<-college.data.no_na[,i]/college.data.no_na$total_enrollment
 }
 
-#chart.Correlation(college.data.unique[,c(6:27)], histogram=T, method="pearson")
-corrplot::corrplot(cor(college.data.unique[,c(6:27)]), diag=F, type="lower", tl.cex=0.64)
+## Correlation Matrix for Numeric Columns
+college.class<-sapply(college.data, class)
+college.unique<-sapply(college.data, function(x)length(unique(x)))
+num.cols<-college.class%in%c("integer", "numeric")&college.unique>1
+college.data.num<-college.data.no_na[,num.cols]
+corr.mat<-cor(college.data.num)
+cor.thresh<-0.7 # Used to limit displayed matrix cuz it's kinda big
+corr.mat.extreme.row<-apply(corr.mat, 1, function(x)sum(abs(x)>cor.thresh))>2
+corr.mat.extreme.col<-apply(corr.mat, 2, function(x)sum(abs(x)>cor.thresh))>2
+corr.extreme<-corr.mat[corr.mat.extreme.row,corr.mat.extreme.col]
+corrplot::corrplot(corr.extreme, diag=F, type="lower", tl.cex=0.72)
 ```
+
+## Categorical Data (Boxplots)
+
+```{r}
+college.class<-sapply(college.data.no_na, class)
+num.cols<-college.class=="factor"
+for(i in colnames(college.data.no_na)[num.cols]){
+  par(mfrow=c(1, 3))
+  boxplot(college.data.no_na$C150_POOLED~droplevels(college.data.no_na[,i]),
+          xlab=i, ylab="Graduation Rate")
+  boxplot(college.data.no_na$early_career_pay~droplevels(college.data.no_na[,i]),
+          xlab=i, ylab="Early Career Pay")
+  boxplot(college.data.no_na$mid_career_pay~droplevels(college.data.no_na[,i]),
+          xlab=i, ylab="Mid Career Pay")
+}
+```
+
 
