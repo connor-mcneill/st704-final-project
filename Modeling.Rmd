@@ -1,0 +1,210 @@
+---
+title: "Modeling"
+author: "Carter Hall"
+date: "2024-04-06"
+output: html_document
+---
+
+## Package Imports
+
+```{r}
+library(MASS)
+library(tidyverse)
+library(car)
+```
+
+## Preprocessing
+
+```{r}
+cleanedData <- read_csv("data/college_data_cleaned.csv")
+cleanedData <- cleanedData[,-c(4,17,18,ncol(cleanedData),65)]
+# for (i in 1:nrow(cleanedData)) {
+#   for (j in 1:ncol(cleanedData)) {
+#     if (is.na(cleanedData)[i,j]) {
+#       
+#     } else if (cleanedData[i,j] == "NULL" || cleanedData[i,j] == "PrivacySuppressed") {
+#       cleanedData[i,j] <- NA
+#     }
+#   }
+# }
+cleanedData[(cleanedData == "NULL") | (cleanedData == "PrivacySuppressed")] <- NA
+
+satMod <- lm(as.numeric(sat_avg) ~ as.numeric(admission_rate), data = na.omit(cleanedData))
+
+cleanedData <- cleanedData %>% mutate(
+  type_school = as.factor(type_school),
+  degree_length = as.factor(degree_length),
+  state_code.x = as.factor(state_code.x),
+  REGION = as.factor(REGION),
+  LOCALE = as.factor(LOCALE),
+  degree_type = as.factor(degree_type),
+  admission_rate = as.numeric(admission_rate),
+  age_entry = as.numeric(age_entry),
+  first_gen = as.numeric(first_gen),
+  pct_domestic = as.numeric(pct_domestic),
+  pct_grad_degree = as.numeric(pct_grad_degree),
+  sat_avg = as.numeric(sat_avg),
+  netprice_lowincome = as.numeric(netprice_lowincome),
+  highest_degree = as.factor(highest_degree),
+  med_fam_inc = as.numeric(med_fam_inc)) %>%
+  mutate(
+    admission_rate = ifelse(is.na(admission_rate), 
+                            median(admission_rate,na.rm=T), admission_rate)) %>%
+  mutate(
+        sat_avg = ifelse(is.na(sat_avg), 
+                     coef(satMod)[0] + coef(satMod)[1]*admission_rate,sat_avg),
+    age_entry = ifelse(is.na(admission_rate), 
+                            mean(age_entry,na.rm=T), age_entry),
+    first_gen = ifelse(is.na(first_gen), 
+                            mean(first_gen,na.rm=T), first_gen),
+    med_fam_inc = ifelse(is.na(med_fam_inc), 
+                            mean(med_fam_inc,na.rm=T), med_fam_inc),
+    pct_grad_degree = ifelse(is.na(pct_grad_degree), 
+                            mean(pct_grad_degree,na.rm=T), pct_grad_degree),
+    pct_domestic = ifelse(is.na(pct_domestic), 
+                            mean(pct_domestic,na.rm=T), pct_domestic),
+    median_hh_income = ifelse(is.na(median_hh_income), 
+                            median(median_hh_income,na.rm=T),median_hh_income),
+    C150_POOLED = ifelse(is.na(C150_POOLED), 
+                         median(C150_POOLED,na.rm=T),C150_POOLED),
+    netprice_lowincome = ifelse(is.na(netprice_lowincome), 
+                                median(netprice_lowincome,na.rm=T),
+                                netprice_lowincome),
+    room_and_board = ifelse(is.na(room_and_board), median(room_and_board,na.rm=T),
+                            room_and_board),
+    total_enrollment = ifelse(is.na(total_enrollment), 
+                              median(total_enrollment,na.rm=T),total_enrollment),
+    make_world_better_percent = ifelse(is.na(make_world_better_percent), 
+                            median(make_world_better_percent,na.rm=T),
+                            make_world_better_percent)
+) %>% rename(
+  "state_code" = "state_code.x",
+  "region" = "REGION",
+  "locale" = "LOCALE"
+) %>% mutate(
+  hbcu = as.factor(hbcu),
+  pbi = as.factor(pbi),
+  annhi = as.factor(annhi),
+  tribal = as.factor(tribal),
+  AANAPII = as.factor(AANAPII),
+  his = as.factor(his),
+  nanti = as.factor(nanti),
+  men_only = as.factor(men_only),
+  women_only = as.factor(women_only),
+  distance_only = as.factor(distance_only),
+  pred_degree_type = as.factor(pred_degree_type),
+  netprice_lowincome = as.numeric(netprice_lowincome),
+  tuit_fte = as.numeric(tuit_fte),
+  inexp_fte = as.numeric(inexp_fte),
+  avg_fac_salary = as.numeric(avg_fac_salary),
+  pct_ft_fac = as.numeric(pct_ft_fac),
+  pct_pell = as.numeric(pct_pell),
+  C150_POOLED = as.numeric(C150_POOLED),
+  median_hh_income = as.numeric(median_hh_income),
+  poverty_rate = as.numeric(poverty_rate),
+  unemployment_rate = as.numeric(unemployment_rate)
+) %>% mutate(
+  Women = Women / total_enrollment,
+  `American Indian / Alaska Native` = `American Indian / Alaska Native` / total_enrollment,
+  Asian = Asian / total_enrollment,
+  Black = Black / total_enrollment,
+  Hispanic = Hispanic / total_enrollment,
+  `Native Hawaiian / Pacific Islander` = `Native Hawaiian / Pacific Islander` / total_enrollment,
+  White = White / total_enrollment,
+  `Two Or More Races` = `Two Or More Races` / total_enrollment,
+  Unknown = Unknown / total_enrollment
+) %>% dplyr::select(
+  -tribal,-cash_monitoring
+) %>% mutate(
+  unemployment_rate = unemployment_rate / 100,
+  pct_grad_degree = pct_grad_degree / 100,
+  make_world_better_percent = make_world_better_percent / 100,
+  stem_percent = stem_percent / 100,
+  pct_domestic = pct_domestic / 100
+)
+
+## Upload this dataset (write.csv)
+cleanedData
+cleanedData <- na.omit(cleanedData)
+write.csv(cleanedData,"data/cleanedData_411.csv")
+```
+
+## Helper Functions
+```{r}
+#' @title Analysis of Deviance for Full/Reduced GLMs
+#' @description Give nested GLMs and return AOD test p-value
+AODglms <- function(full, red) {
+  return(
+    pchisq(q = deviance(red) - deviance(full),
+          df = red$df.residual-full$df.residual,lower=F)
+  )
+}
+```
+
+## Modeling
+
+### Train-Test Split for Cross Validation
+
+```{r}
+set.seed(704)
+idxs <- sample(1:nrow(cleanedData),replace = F,size = 0.8*nrow(cleanedData))
+train <- cleanedData[idxs,]
+test  <- cleanedData[-idxs,]
+
+# write.csv(train, "./data/train_411.csv")
+# write.csv(test, "./data/test_411.csv")
+```
+
+### Linear Regression 
+
+```{r}
+# for (j in 1:ncol(train)) {
+#   print(names(train)[j])
+#   lm(early_career_pay ~ .,
+#      data = train[,c(1:j,12)])
+# }
+
+lmMod1 <- lm(early_career_pay ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type, 
+   data = train)
+summary(lmMod1)
+vifslm1 <- vif(lmMod1)
+vifslm1[order(vifslm1[,1],decreasing = T),]
+
+plot(lmMod1)
+bc <- boxCox(lmMod1)
+bc$x[which.max(bc$y)] 
+
+lmMod1b <- lm(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type, 
+   data = train)
+summary(lmMod1b)
+plot(lmMod1b)
+
+car::crPlots(lmMod1b,terms = ~.)
+boxTidwell(log(early_career_pay) ~ unemployment_rate,
+           data = train)
+
+lmMod1c <- lm(log(early_career_pay) ~ . + I(asin(sqrt(Women))) + I(unemployment_rate^4)-name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type,
+   data = train)
+summary(lmMod1c)
+plot(lmMod1c)
+
+car::crPlots(lmMod1c,terms = ~.)
+```
+
+For the report/supplemental:
+- Include this linear regression and explain why this model is insufficient
+  (i.e., consider other models)
+
+Other Models:
+- LASSO and/or PLSR/PCR (dim. red. approaches)
+- Nonlinear?
+- Novel model :p

@@ -6,7 +6,6 @@ output: pdf_document
 # Load Packages and Data
 
 ```{r, warning=F, message=F}
-require(PerformanceAnalytics)
 require(corrplot)
 require(tidyverse)
 ```
@@ -99,4 +98,8 @@ for(i in colnames(college.data.no_na)[num.cols]){
 }
 ```
 
+
+```{r}
+plot(college.data$early_career_pay, college.data$mid_career_pay)
+```
 
