@@ -1,0 +1,46 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{a4paper, left=2cm, right=2cm, top=1.5cm, bottom=3cm }
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{natbib}
+
+\usepackage{etoolbox,fancyhdr,xcolor}
+\newcommand{\headrulecolor}[1]{\patchcmd{\headrule}{\hrule}{\color{#1}\hrule}{}{}}
+\newcommand{\footrulecolor}[1]{\patchcmd{\footrule}{\hrule}{\color{#1}\hrule}{}{}}
+\renewcommand{\headrulewidth}{1pt}
+\headrulecolor{red!100}%
+\renewcommand{\footrulewidth}{1pt}
+\footrulecolor{red!100}%
+
+\fancyhf{}
+\fancyhead[R]{\includegraphics[width=0.25\textwidth]{NCSUImage.png}}
+
+\fancyfoot[L]{ST 704 Final Project}
+\fancyfoot[C]{Department of Statistics}
+\fancyfoot[R]{\thepage}
+
+\setlength{\headheight}{15mm}
+\pagestyle{fancy}
+
+\bibliographystyle{apalike}
+
+\usepackage{times}
+\begin{document}
+
+\noindent 
+\begin{center}
+\textbf{{\Large ST 704 Final Project Plan}} \\
+\end{center}
+
+\noindent 
+\textbf{Carter Hall, Connor McNeill, Miles Woollacott} \textit{North Carolina State University}
+\\
+
+\noindent
+Response Variable: $\textit{early\_career\_pay}$ 
+\end{document}
