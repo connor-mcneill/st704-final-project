@@ -1,0 +1,367 @@
+---
+title: "Modeling"
+author: "Carter Hall"
+date: "2024-04-06"
+output: html_document
+---
+
+## Package Imports
+
+```{r}
+library(MASS)
+library(tidyverse)
+library(car)
+library(caret)
+library(leaps)
+library(glmnet)
+library(pls)
+set.seed(704)
+```
+
+## Preprocessing
+
+```{r}
+cleanedData <- read_csv("data/college_data_cleaned.csv")
+cleanedData <- cleanedData[,-c(4,17,18,ncol(cleanedData),65)]
+# for (i in 1:nrow(cleanedData)) {
+#   for (j in 1:ncol(cleanedData)) {
+#     if (is.na(cleanedData)[i,j]) {
+#       
+#     } else if (cleanedData[i,j] == "NULL" || cleanedData[i,j] == "PrivacySuppressed") {
+#       cleanedData[i,j] <- NA
+#     }
+#   }
+# }
+cleanedData[(cleanedData == "NULL") | (cleanedData == "PrivacySuppressed")] <- NA
+
+satMod <- lm(as.numeric(sat_avg) ~ as.numeric(admission_rate), data = na.omit(cleanedData))
+
+cleanedData <- cleanedData %>% mutate(
+  type_school = as.factor(type_school),
+  degree_length = as.factor(degree_length),
+  state_code.x = as.factor(state_code.x),
+  REGION = as.factor(REGION),
+  LOCALE = as.factor(LOCALE),
+  degree_type = as.factor(degree_type),
+  admission_rate = as.numeric(admission_rate),
+  age_entry = as.numeric(age_entry),
+  first_gen = as.numeric(first_gen),
+  pct_domestic = as.numeric(pct_domestic),
+  pct_grad_degree = as.numeric(pct_grad_degree),
+  sat_avg = as.numeric(sat_avg),
+  netprice_lowincome = as.numeric(netprice_lowincome),
+  highest_degree = as.factor(highest_degree),
+  med_fam_inc = as.numeric(med_fam_inc)) %>%
+  mutate(
+    admission_rate = ifelse(is.na(admission_rate), 
+                            median(admission_rate,na.rm=T), admission_rate))
+
+cleanedData <- cleanedData %>%
+  mutate(
+        sat_avg = ifelse(is.na(sat_avg), 
+                     coef(satMod)[1] + coef(satMod)[2]*admission_rate,sat_avg),
+    age_entry = ifelse(is.na(admission_rate), 
+                            mean(age_entry,na.rm=T), age_entry),
+    first_gen = ifelse(is.na(first_gen), 
+                            mean(first_gen,na.rm=T), first_gen),
+    med_fam_inc = ifelse(is.na(med_fam_inc), 
+                            mean(med_fam_inc,na.rm=T), med_fam_inc),
+    pct_grad_degree = ifelse(is.na(pct_grad_degree), 
+                            mean(pct_grad_degree,na.rm=T), pct_grad_degree),
+    pct_domestic = ifelse(is.na(pct_domestic), 
+                            mean(pct_domestic,na.rm=T), pct_domestic),
+    median_hh_income = ifelse(is.na(median_hh_income), 
+                            median(median_hh_income,na.rm=T),median_hh_income),
+    C150_POOLED = ifelse(is.na(C150_POOLED), 
+                         median(C150_POOLED,na.rm=T),C150_POOLED),
+    netprice_lowincome = ifelse(is.na(netprice_lowincome), 
+                                median(netprice_lowincome,na.rm=T),
+                                netprice_lowincome),
+    room_and_board = ifelse(is.na(room_and_board), median(room_and_board,na.rm=T),
+                            room_and_board),
+    total_enrollment = ifelse(is.na(total_enrollment), 
+                              median(total_enrollment,na.rm=T),total_enrollment),
+    make_world_better_percent = ifelse(is.na(make_world_better_percent), 
+                            median(make_world_better_percent,na.rm=T),
+                            make_world_better_percent)
+) %>% rename(
+  "state_code" = "state_code.x",
+  "region" = "REGION",
+  "locale" = "LOCALE"
+) %>% mutate(
+  hbcu = as.factor(hbcu),
+  pbi = as.factor(pbi),
+  annhi = as.factor(annhi),
+  tribal = as.factor(tribal),
+  AANAPII = as.factor(AANAPII),
+  his = as.factor(his),
+  nanti = as.factor(nanti),
+  men_only = as.factor(men_only),
+  women_only = as.factor(women_only),
+  distance_only = as.factor(distance_only),
+  pred_degree_type = as.factor(pred_degree_type),
+  netprice_lowincome = as.numeric(netprice_lowincome),
+  tuit_fte = as.numeric(tuit_fte),
+  inexp_fte = as.numeric(inexp_fte),
+  avg_fac_salary = as.numeric(avg_fac_salary),
+  pct_ft_fac = as.numeric(pct_ft_fac),
+  pct_pell = as.numeric(pct_pell),
+  C150_POOLED = as.numeric(C150_POOLED),
+  median_hh_income = as.numeric(median_hh_income),
+  poverty_rate = as.numeric(poverty_rate),
+  unemployment_rate = as.numeric(unemployment_rate)
+) %>% mutate(
+  Women = Women / total_enrollment,
+  `American Indian / Alaska Native` = `American Indian / Alaska Native` / total_enrollment,
+  Asian = Asian / total_enrollment,
+  Black = Black / total_enrollment,
+  Hispanic = Hispanic / total_enrollment,
+  `Native Hawaiian / Pacific Islander` = `Native Hawaiian / Pacific Islander` / total_enrollment,
+  White = White / total_enrollment,
+  `Two Or More Races` = `Two Or More Races` / total_enrollment,
+  Unknown = Unknown / total_enrollment
+) %>% dplyr::select(
+  -tribal,-cash_monitoring
+) %>% mutate(
+  unemployment_rate = unemployment_rate / 100,
+  pct_grad_degree = pct_grad_degree / 100,
+  make_world_better_percent = make_world_better_percent / 100,
+  stem_percent = stem_percent / 100,
+  pct_domestic = pct_domestic / 100
+)
+
+## Upload this dataset (write.csv)
+cleanedData
+cleanedData <- na.omit(cleanedData)
+# write_csv(cleanedData,"data/cleanedData_411.csv")
+```
+
+## Helper Functions
+```{r}
+#' @title Analysis of Deviance for Full/Reduced GLMs
+#' @description Give nested GLMs and return AOD test p-value
+AODglms <- function(full, red) {
+  return(
+    pchisq(q = deviance(red) - deviance(full),
+          df = red$df.residual-full$df.residual,lower=F)
+  )
+}
+
+#' @title Compute RMSE
+#' @description Compute root mean squared error (can be used for RMPSE)
+RMSE <- function(pred, obs) {
+  return(sqrt(mean((pred - obs)^2)))
+}
+```
+
+## Modeling
+
+### Train-Test Split for Cross Validation
+
+```{r}
+# idxs <- sample(1:nrow(cleanedData),replace = F,size = 0.8*nrow(cleanedData))
+# train <- cleanedData[idxs,]
+# test  <- cleanedData[-idxs,]
+
+# saveRDS(train, "./data/train_414.Rds")
+# saveRDS(test, "./data/test_414.Rds")
+
+train <- readRDS("data/train_414.Rds")
+test <- readRDS("data/test_414.Rds")
+
+findHC <- function(data, threshold = 0.8) {
+  # Compute correlation matrix
+  correlation_matrix <- cor(data)
+  
+  # Find indices of highly correlated variables
+  correlated_indices <- which(abs(correlation_matrix) > threshold & correlation_matrix < 1, arr.ind = TRUE)
+  
+  # Extract variable pairs
+  variable_pairs <- data.frame(Variable1 = rownames(correlation_matrix)[correlated_indices[, 1]],
+                                Variable2 = colnames(correlation_matrix)[correlated_indices[, 2]],
+                                Correlation = correlation_matrix[correlated_indices])
+  
+  return(variable_pairs)
+}
+
+findHC(train %>% dplyr::select_if(is.numeric))
+```
+
+### Linear Regression 
+
+```{r}
+# for (j in 1:ncol(train)) {
+#   print(names(train)[j])
+#   lm(early_career_pay ~ .,
+#      data = train[,c(1:j,13)])
+# }
+
+lmMod1 <- lm(early_career_pay ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type-in_state_tuition-out_of_state_tuition, 
+   data = train)
+summary(lmMod1)
+vifslm1 <- vif(lmMod1)
+vifslm1[order(vifslm1[,1]),]
+
+plot(lmMod1)
+bc <- boxCox(lmMod1,plotit = F)
+bc$x[which.max(bc$y)] 
+
+lmMod1b <- lm(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type, 
+   data = train)
+summary(lmMod1b)
+plot(lmMod1b)
+
+car::crPlots(lmMod1b,terms = ~.)
+boxTidwell(log(early_career_pay) ~ unemployment_rate,
+           data = train)
+boxTidwell(log(early_career_pay) ~ inexp_fte,
+           data = train)
+boxTidwell(log(early_career_pay) ~ pct_domestic,
+           data = train)
+
+lmMod1c <- lm(log(early_career_pay) ~ . + I(asin(sqrt(Women))) + I(unemployment_rate^4) + log(inexp_fte) + I(pct_domestic^(11))-name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type,
+   data = train)
+summary(lmMod1c)
+plot(lmMod1c)
+car::qqPlot(lmMod1c)
+# car::crPlots(lmMod1c,terms = ~.)
+
+length(coef(lmMod1c))
+```
+
+For the report/supplemental:
+- Include this linear regression and explain why this model is insufficient
+  (i.e., desire for parsimony leads us to consider other models)
+
+```{r}
+train_transformed <- train %>% mutate(
+        arcsin_women = I(asin(sqrt(Women))),
+        unemp_rate_fourth = I(unemployment_rate^4),
+        log_inexp_fte = log(inexp_fte),
+        pct_dom_elvth = I(pct_domestic^(11))
+      )
+test_transformed <- test %>% mutate(
+        arcsin_women = asin(sqrt(Women)),
+        unemp_rate_fourth = unemployment_rate^4,
+        log_inexp_fte = log(inexp_fte),
+        pct_dom_elvth = I(pct_domestic^(11))
+      )
+
+train_transformed
+```
+
+
+#### LASSO Regression
+
+```{r}
+X <- model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type-in_state_tuition-out_of_state_tuition,
+      data = train_transformed)[,-1]
+
+lassoMod <- cv.glmnet(X,log(train_transformed$early_career_pay),alpha=1)
+plot(lassoMod)
+lassoMod$lambda.1se
+
+nn = nrow(X)
+Xsd = apply(X,2,sd) *sqrt((nn-1)/nn)
+
+matplot(lassoMod$glmnet.fit$lambda, t(lassoMod$glmnet.fit$beta * Xsd), 
+        type="l", log="x", lwd=2,lty=1:5,col=1:6)
+abline(v=lassoMod$lambda.1se,lwd=3)
+legend("topleft",inset=c(0,0),legend=names(Xsd),
+       horiz=FALSE,lty=1:5,col=1:6,cex = 0.385,ncol = 5)
+axis(3, at=lassoMod$glmnet.fit$lambda, labels=lassoMod$glmnet.fit$df)
+
+lassoFinal <- glmnet(X,log(train_transformed$early_career_pay),alpha=1,
+                     lambda = lassoMod$lambda.1se)
+fittedLasso <- predict(lassoFinal,X)
+rmseLasso <- RMSE(fittedLasso, log(train_transformed$early_career_pay))
+
+# plot(x=1:nrow(train_transformed),y=train_transformed$early_career_pay)
+# points(x=1:nrow(train_transformed),y=predLasso,col="red")
+
+resid <- log(train_transformed$early_career_pay) - fittedLasso
+car::qqPlot(resid)
+
+names(which(coef(lassoFinal)[,1] != 0)[2:length(which(coef(lassoFinal)[,1] != 0))])
+```
+
+#### PLSR
+
+```{r}
+fitPLSR <- plsr(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type-in_state_tuition-out_of_state_tuition,
+      data = train_transformed,scale=TRUE,center=TRUE,validation="CV",
+      segments=10,segment.type="random",method="simpls")
+ncompPLSR <- selectNcomp(fitPLSR,method="onesigma",plot=TRUE)
+
+coefplot(fitPLSR,separate=F,ncomp=1:14)
+legend(x=12,y=0.045,inset=.01,legend=sapply(1:14,function(c){paste(c,"comps")}),
+ horiz=FALSE,lty=1:5,col=1:6,cex=0.6,ncol = 2)
+summary(fitPLSR)
+
+fitPLSR$loadings[,1:ncompPLSR]
+```
+
+```{r}
+rmsePLSR <- RMSE(pred = predict(fitPLSR,ncomp = ncompPLSR,newdata = train_transformed),
+     obs = log(train_transformed$early_career_pay))
+```
+
+#### PCR
+
+```{r}
+fitPCR <- pcr(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type-in_state_tuition-out_of_state_tuition,
+      data = train_transformed,scale=TRUE,validation="CV",
+      segments=10,segment.type="random")
+ncompPCR <- selectNcomp(fitPCR,method="onesigma",plot=TRUE)
+
+coefplot(fitPCR,separate=F,ncomp=1:14)
+legend(x=12,y=0.045,inset=.01,legend=sapply(1:14,function(c){paste(c,"comps")}),
+ horiz=FALSE,lty=1:5,col=1:6,cex=0.6,ncol = 2)
+summary(fitPCR)
+
+fitPCR$loadings[,1:ncompPCR]
+```
+
+```{r}
+rmsePCR <- RMSE(pred = predict(fitPCR,ncomp = ncompPCR,newdata = train_transformed),
+     obs = log(train_transformed$early_career_pay))
+```
+
+
+##### Dimension Reduction Screes
+
+```{r}
+getScreePlot<-function(fit,label="PCR",suggested=1,...){
+ plot(cumsum(fit$Xvar / fit$Xtotvar),type="b",
+ xlab="NumberofComponents",ylab="%VarianceExplained",
+ main=paste0("ScreePlotfor ",label))
+ abline(h=0.5,col="red")
+ abline(h=0.7,col="blue")
+ abline(h=0.9,col="pink")
+ abline(v=suggested)
+ legend(x=12,y=0.45,legend= c("50%","70%","90%"),fill= c("red","blue","pink"))
+}
+
+getScreePlot(fitPLSR, "PLSR", suggested = ncompPLSR)
+getScreePlot(fitPCR, "PCR", suggested = ncompPCR)
+```
+
+### GLM
