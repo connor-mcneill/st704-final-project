@@ -196,6 +196,7 @@ X = model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
                         -pred_degree_type, data=train)
+library(plm)
 detect.lindep(X)
 
 getit <- train(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
