@@ -391,6 +391,7 @@ fit.pls = plsr(log(early_career_pay) ~ degree_length + room_and_board +
 ncomp.pls1se = selectNcomp(fit.pls,method="onesigma",plot=TRUE)
 pls.preds = predict(fit.pls, newdata=test, ncomp=ncomp.pls1se)
 pls.rmsep = RMSE(pls.preds, log(test$early_career_pay))
+save(test, file='data/test.RData')
 ```
 
 For the report/supplemental:
