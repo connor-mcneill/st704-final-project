@@ -18,15 +18,6 @@ library(car)
 ```{r}
 cleanedData <- read_csv("data/college_data_cleaned.csv")
 cleanedData <- cleanedData[,-c(4,17,18,ncol(cleanedData),65)]
-# for (i in 1:nrow(cleanedData)) {
-#   for (j in 1:ncol(cleanedData)) {
-#     if (is.na(cleanedData)[i,j]) {
-#       
-#     } else if (cleanedData[i,j] == "NULL" || cleanedData[i,j] == "PrivacySuppressed") {
-#       cleanedData[i,j] <- NA
-#     }
-#   }
-# }
 cleanedData[(cleanedData == "NULL") | (cleanedData == "PrivacySuppressed")] <- NA
 
 satMod <- lm(as.numeric(sat_avg) ~ as.numeric(admission_rate), data = na.omit(cleanedData))
@@ -52,7 +43,7 @@ cleanedData <- cleanedData %>% mutate(
                             median(admission_rate,na.rm=T), admission_rate)) %>%
   mutate(
         sat_avg = ifelse(is.na(sat_avg), 
-                     coef(satMod)[0] + coef(satMod)[1]*admission_rate,sat_avg),
+                     coef(satMod)[1] + coef(satMod)[2]*admission_rate,sat_avg),
     age_entry = ifelse(is.na(admission_rate), 
                             mean(age_entry,na.rm=T), age_entry),
     first_gen = ifelse(is.na(first_gen), 
@@ -80,7 +71,10 @@ cleanedData <- cleanedData %>% mutate(
 ) %>% rename(
   "state_code" = "state_code.x",
   "region" = "REGION",
-  "locale" = "LOCALE"
+  "locale" = "LOCALE",
+  "PacificIslander" = "Native Hawaiian / Pacific Islander",
+  "AmericanIndian" = "American Indian / Alaska Native",
+  "TwoOrMoreRaces" = "Two Or More Races"
 ) %>% mutate(
   hbcu = as.factor(hbcu),
   pbi = as.factor(pbi),
@@ -105,13 +99,13 @@ cleanedData <- cleanedData %>% mutate(
   unemployment_rate = as.numeric(unemployment_rate)
 ) %>% mutate(
   Women = Women / total_enrollment,
-  `American Indian / Alaska Native` = `American Indian / Alaska Native` / total_enrollment,
+  AmericanIndian = AmericanIndian / total_enrollment,
   Asian = Asian / total_enrollment,
   Black = Black / total_enrollment,
   Hispanic = Hispanic / total_enrollment,
-  `Native Hawaiian / Pacific Islander` = `Native Hawaiian / Pacific Islander` / total_enrollment,
+  PacificIslander = PacificIslander / total_enrollment,
   White = White / total_enrollment,
-  `Two Or More Races` = `Two Or More Races` / total_enrollment,
+  TwoOrMoreRaces = TwoOrMoreRaces / total_enrollment,
   Unknown = Unknown / total_enrollment
 ) %>% dplyr::select(
   -tribal,-cash_monitoring
@@ -126,7 +120,7 @@ cleanedData <- cleanedData %>% mutate(
 ## Upload this dataset (write.csv)
 cleanedData
 cleanedData <- na.omit(cleanedData)
-write.csv(cleanedData,"data/cleanedData_411.csv")
+#write.csv(cleanedData,"data/cleanedData_411.csv")
 ```
 
 ## Helper Functions
@@ -151,18 +145,12 @@ idxs <- sample(1:nrow(cleanedData),replace = F,size = 0.8*nrow(cleanedData))
 train <- cleanedData[idxs,]
 test  <- cleanedData[-idxs,]
 
-# write.csv(train, "./data/train_411.csv")
-# write.csv(test, "./data/test_411.csv")
 ```
 
 ### Linear Regression 
 
 ```{r}
-# for (j in 1:ncol(train)) {
-#   print(names(train)[j])
-#   lm(early_career_pay ~ .,
-#      data = train[,c(1:j,12)])
-# }
+
 
 lmMod1 <- lm(early_career_pay ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
@@ -180,24 +168,48 @@ bc$x[which.max(bc$y)]
 lmMod1b <- lm(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
-                        -pred_degree_type, 
+                        -pred_degree_type-highest_degree, 
    data = train)
 summary(lmMod1b)
+vif(lmMod1b)
 plot(lmMod1b)
 
 car::crPlots(lmMod1b,terms = ~.)
-boxTidwell(log(early_career_pay) ~ unemployment_rate,
-           data = train)
+residualPlots(lmMod1b, terms = ~.)
 
 lmMod1c <- lm(log(early_career_pay) ~ . + I(asin(sqrt(Women))) + I(unemployment_rate^4)-name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
-                        -pred_degree_type,
+                        -pred_degree_type-highest_degree,
    data = train)
 summary(lmMod1c)
 plot(lmMod1c)
 
 car::crPlots(lmMod1c,terms = ~.)
+```
+
+```{r}
+library(caret)
+library(leaps)
+K=10
+X = model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type, data=train)
+detect.lindep(X)
+
+getit <- train(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type-highest_degree, 
+               data=train,
+               method='leapSeq',
+               tuneGrid=data.frame(nvmax = 1:50),
+               trControl=trainControl(method='cv',
+                                      number=K,
+                                      returnResamp='all',
+                                      selectionFunction='oneSE'))
+coef(getit$finalModel, id=7)
 ```
 
 For the report/supplemental:
