@@ -154,7 +154,26 @@ test  <- cleanedData[-idxs,]
 
 ```
 
+```{r}
+# Load in data
+#train = readRDS('data/train_414.Rds')
+#test = readRDS('data/test_414.Rds')
+```
+
 ### Linear Regression 
+
+```{r}
+college.class<-sapply(train, class)
+college.unique<-sapply(train, function(x)length(unique(x)))
+num.cols<-college.class%in%c("integer", "numeric")&college.unique>1
+college.data.num<-train[,num.cols]
+corr.mat<-cor(college.data.num)
+cor.thresh<-0.9 # Used to limit displayed matrix cuz it's kinda big
+corr.mat.extreme.row<-apply(corr.mat, 1, function(x)sum(abs(x)>cor.thresh))>2
+corr.mat.extreme.col<-apply(corr.mat, 2, function(x)sum(abs(x)>cor.thresh))>2
+corr.extreme<-corr.mat[corr.mat.extreme.row,corr.mat.extreme.col]
+corrplot::corrplot(corr.extreme, diag=F, type="lower", tl.cex=0.72)
+```
 
 ```{r}
 lmMod1 <- lm(early_career_pay ~ . -name-state-mid_career_pay-state_code
@@ -171,14 +190,20 @@ bc <- boxCox(lmMod1)
 bc$x[which.max(bc$y)] 
 qqPlot(lmMod1)
 
+boxTidwell(log(early_career_pay) ~ room_and_board + total_enrollment + ST_FIPS + admission_rate + sat_avg + first_gen + med_fam_inc + pct_domestic + median_hh_income, other.x = ~ degree_length + make_world_better_percent + stem_percent + degree_type + type_school + locale + hbcu + pbi + annhi + AANAPII + his + nanti + men_only + women_only + distance_only,  data=train)
+
+numberzeros = colSums(train == 0)
+View(numberzeros)
+
 lmMod1b <- lm(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
-                        -pred_degree_type-highest_degree, 
+                        -pred_degree_type-highest_degree+I(room_and_board^-2)-total_enrollment+log(total_enrollment)+I(admission_rate^(-1)),
    data = train)
 summary(lmMod1b)
 vif(lmMod1b)
 plot(lmMod1b)
+residualPlots(lmMod1b)
 
 lmMod1c <- lm(log(early_career_pay) ~ . + I(asin(sqrt(Women))) + I(unemployment_rate^4)-name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
@@ -190,10 +215,30 @@ plot(lmMod1c)
 ```
 
 ```{r}
+transformed.lm = lm(log(early_career_pay) ~ degree_length + room_and_board +
+                      out_of_state_tuition +
+                      make_world_better_percent + stem_percent + degree_type +
+                      type_school + ST_FIPS + locale + hbcu + annhi + AANAPII +
+                      his + nanti + men_only + women_only + admission_rate
+                      + I(admission_rate^-1) + log(total_enrollment) +
+                      sat_avg + distance_only + netprice_lowincome +
+                      tuit_fte + inexp_fte + avg_fac_salary + pct_ft_fac +
+                      pct_pell + graduation_rate + age_entry + first_gen +
+                      pct_grad_degree + pct_domestic + I(pct_domestic^4) +
+                      unemployment_rate +
+                      Women + AmericanIndian + Asian + Hispanic +
+                      PacificIslander + White + TwoOrMoreRaces + Unknown
+                    , 
+                    data=train)
+
+X = model.matrix(transformed.lm)
+```
+
+```{r}
 library(caret)
 library(leaps)
 K=10
-X = model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+X.og = model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
                         -pred_degree_type-highest_degree, data=train)
@@ -211,12 +256,39 @@ getit <- train(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                                       returnResamp='all',
                                       selectionFunction='oneSE'))
 coef(getit$finalModel, id=5)
-stepwise.model = lm(log(early_career_pay) ~ make_world_better_percent +
-                      stem_percent + avg_fac_salary + pct_pell + median_hh_income,
+set.seed(704)
+stepwise.selection <- train(log(early_career_pay) ~ degree_length + room_and_board +
+                      out_of_state_tuition +
+                      make_world_better_percent + stem_percent + degree_type +
+                      type_school + ST_FIPS + locale + hbcu + annhi + AANAPII +
+                      his + nanti + men_only + women_only + admission_rate
+                      + I(admission_rate^-1) + log(total_enrollment) +
+                      sat_avg + distance_only + netprice_lowincome +
+                      tuit_fte + inexp_fte + avg_fac_salary + pct_ft_fac +
+                      pct_pell + graduation_rate + age_entry + first_gen +
+                      pct_grad_degree + pct_domestic + I(pct_domestic^4) +
+                      unemployment_rate +
+                      Women + AmericanIndian + Asian + Hispanic +
+                      PacificIslander + White + TwoOrMoreRaces + Unknown, 
+                    data=train,
+                      method='leapSeq',
+                      tuneGrid=data.frame(nvmax = 1:50),
+                      trControl=trainControl(method='cv',
+                                             number=K,
+                                             returnResamp='all',
+                                             selectionFunction='oneSE')
+                    )
+stepwise.selection
+coef(stepwise.selection$finalModel, id=6)
+stepwise.model = lm(log(early_career_pay) ~ make_world_better_percent + 
+                      stem_percent +
+                       tuit_fte + avg_fac_salary + pct_pell + pct_domestic + 
+                      I(pct_domestic^4),
                     data=train)
+summary(stepwise.model)
 plot(stepwise.model)
 stepwise.preds = predict(stepwise.model, newdata = test)
-stepwise.rmspe = RMSE(stepwise.preds, log(test$early_career_pay))
+stepwise.rmsep = RMSE(stepwise.preds, log(test$early_career_pay))
 ```
 
 ```{r}
@@ -242,10 +314,20 @@ cv.lasso <- cv.glmnet(X, log(train$early_career_pay), alpha=1)
 plot(cv.lasso)
 lambda.lasso.chosen <- cv.lasso$lambda.1se
 coef(fit.lasso, s=lambda.lasso.chosen)
-X.test.lasso = model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
-                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
-                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
-                        -pred_degree_type-highest_degree, data=test)[,-1]
+X.test.lasso = model.matrix(log(early_career_pay) ~ degree_length + room_and_board +
+                      out_of_state_tuition +
+                      make_world_better_percent + stem_percent + degree_type +
+                      type_school + ST_FIPS + locale + hbcu + annhi + AANAPII +
+                      his + nanti + men_only + women_only + admission_rate
+                      + I(admission_rate^-1) + log(total_enrollment) +
+                      sat_avg + distance_only + netprice_lowincome +
+                      tuit_fte + inexp_fte + avg_fac_salary + pct_ft_fac +
+                      pct_pell + graduation_rate + age_entry + first_gen +
+                      pct_grad_degree + pct_domestic + I(pct_domestic^4) +
+                      unemployment_rate +
+                      Women + AmericanIndian + Asian + Hispanic +
+                      PacificIslander + White + TwoOrMoreRaces + Unknown, 
+                      data=test)[,-1]
 coef(fit.lasso, s=lambda.lasso.chosen)
 lasso.preds = predict(fit.lasso, s=lambda.lasso.chosen, newx=X.test.lasso)
 lasso.rmspe = RMSE(lasso.preds, log(test$early_career_pay))
@@ -256,10 +338,19 @@ lasso.rmspe = RMSE(lasso.preds, log(test$early_career_pay))
 # PCR
 library(pls)
 set.seed(704)
-fit.pcr = pcr(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
-                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
-                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
-                        -pred_degree_type-highest_degree,
+fit.pcr = pcr(log(early_career_pay) ~ degree_length + room_and_board +
+                      out_of_state_tuition +
+                      make_world_better_percent + stem_percent + degree_type +
+                      type_school + ST_FIPS + locale + hbcu + annhi + AANAPII +
+                      his + nanti + men_only + women_only + admission_rate
+                      + I(admission_rate^-1) + log(total_enrollment) +
+                      sat_avg + distance_only + netprice_lowincome +
+                      tuit_fte + inexp_fte + avg_fac_salary + pct_ft_fac +
+                      pct_pell + graduation_rate + age_entry + first_gen +
+                      pct_grad_degree + pct_domestic + I(pct_domestic^4) +
+                      unemployment_rate +
+                      Women + AmericanIndian + Asian + Hispanic +
+                      PacificIslander + White + TwoOrMoreRaces + Unknown, 
               data=train,
               scale=TRUE,
               validation = "CV",
@@ -277,10 +368,19 @@ pcr.rmsep = RMSE(pcr.preds, log(test$early_career_pay))
 
 # PLS
 set.seed(704)
-fit.pls = plsr(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
-                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
-                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
-                        -pred_degree_type-highest_degree,
+fit.pls = plsr(log(early_career_pay) ~ degree_length + room_and_board +
+                      out_of_state_tuition +
+                      make_world_better_percent + stem_percent + degree_type +
+                      type_school + ST_FIPS + locale + hbcu + annhi + AANAPII +
+                      his + nanti + men_only + women_only + admission_rate
+                      + I(admission_rate^-1) + log(total_enrollment) +
+                      sat_avg + distance_only + netprice_lowincome +
+                      tuit_fte + inexp_fte + avg_fac_salary + pct_ft_fac +
+                      pct_pell + graduation_rate + age_entry + first_gen +
+                      pct_grad_degree + pct_domestic + I(pct_domestic^4) +
+                      unemployment_rate +
+                      Women + AmericanIndian + Asian + Hispanic +
+                      PacificIslander + White + TwoOrMoreRaces + Unknown,
               data=train,
               scale=TRUE,
               validation = "CV",
