@@ -198,7 +198,7 @@ X = model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -pred_degree_type, data=train)
 library(plm)
 detect.lindep(X)
-
+set.seed(704)
 getit <- train(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
@@ -210,7 +210,32 @@ getit <- train(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                                       number=K,
                                       returnResamp='all',
                                       selectionFunction='oneSE'))
-coef(getit$finalModel, id=7)
+coef(getit$finalModel, id=5)
+```
+
+```{r}
+library(glmnet)
+# Fit LASSO Model
+X.lasso = X[,-1]
+fit.lasso <- glmnet(X.lasso, log(train$early_career_pay), alpha=1)
+#plot(fit.lasso, label=TRUE, xvar='lambda')
+lambda.lasso = fit.lasso$lambda
+betahat.lasso = fit.lasso$beta
+# plot standardized LASSO coefficients
+nn <- nrow(X.lasso)
+Xsd <- apply(X.lasso,2,sd) * sqrt((nn-1)/nn)
+ysd = sd(train$early_career_pay) * sqrt((nn-1)/nn)
+par(mar=c(5.1, 4.1, 4.1, 8.1), xpd=TRUE)
+matplot(lambda.lasso, t(betahat.lasso * Xsd), type="l",
+log="x", lwd=2,lty=1:5,col=1:6,
+xlab=expression(lambda), ylab='Standardized Coefficients')
+axis(3, at=lambda.lasso, labels=fit.lasso$df)
+# perform CV to find optimal lambda
+set.seed(704)
+cv.lasso <- cv.glmnet(X, log(train$early_career_pay), alpha=1)
+plot(cv.lasso)
+lambda.lasso.chosen <- cv.lasso$lambda.1se
+coef(fit.lasso, s=lambda.lasso.chosen)
 ```
 
 For the report/supplemental:
