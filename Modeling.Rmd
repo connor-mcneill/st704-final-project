@@ -74,7 +74,8 @@ cleanedData <- cleanedData %>% mutate(
   "locale" = "LOCALE",
   "PacificIslander" = "Native Hawaiian / Pacific Islander",
   "AmericanIndian" = "American Indian / Alaska Native",
-  "TwoOrMoreRaces" = "Two Or More Races"
+  "TwoOrMoreRaces" = "Two Or More Races",
+  "graduation_rate" = "C150_POOLED"
 ) %>% mutate(
   hbcu = as.factor(hbcu),
   pbi = as.factor(pbi),
@@ -93,7 +94,7 @@ cleanedData <- cleanedData %>% mutate(
   avg_fac_salary = as.numeric(avg_fac_salary),
   pct_ft_fac = as.numeric(pct_ft_fac),
   pct_pell = as.numeric(pct_pell),
-  C150_POOLED = as.numeric(C150_POOLED),
+  graduation_rate = as.numeric(graduation_rate),
   median_hh_income = as.numeric(median_hh_income),
   poverty_rate = as.numeric(poverty_rate),
   unemployment_rate = as.numeric(unemployment_rate)
@@ -133,6 +134,12 @@ AODglms <- function(full, red) {
           df = red$df.residual-full$df.residual,lower=F)
   )
 }
+
+#' @title Compute RMSE
+#' @description Compute root mean squared error (can be used for RMPSE)
+RMSE.Carter <- function(pred, obs) {
+  return(sqrt(mean((pred - obs)^2)))
+}
 ```
 
 ## Modeling
@@ -150,12 +157,10 @@ test  <- cleanedData[-idxs,]
 ### Linear Regression 
 
 ```{r}
-
-
 lmMod1 <- lm(early_career_pay ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
-                        -pred_degree_type, 
+                        -pred_degree_type-highest_degree, 
    data = train)
 summary(lmMod1)
 vifslm1 <- vif(lmMod1)
@@ -164,6 +169,7 @@ vifslm1[order(vifslm1[,1],decreasing = T),]
 plot(lmMod1)
 bc <- boxCox(lmMod1)
 bc$x[which.max(bc$y)] 
+qqPlot(lmMod1)
 
 lmMod1b <- lm(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
@@ -174,9 +180,6 @@ summary(lmMod1b)
 vif(lmMod1b)
 plot(lmMod1b)
 
-car::crPlots(lmMod1b,terms = ~.)
-residualPlots(lmMod1b, terms = ~.)
-
 lmMod1c <- lm(log(early_career_pay) ~ . + I(asin(sqrt(Women))) + I(unemployment_rate^4)-name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
@@ -184,8 +187,6 @@ lmMod1c <- lm(log(early_career_pay) ~ . + I(asin(sqrt(Women))) + I(unemployment_
    data = train)
 summary(lmMod1c)
 plot(lmMod1c)
-
-car::crPlots(lmMod1c,terms = ~.)
 ```
 
 ```{r}
@@ -195,9 +196,8 @@ K=10
 X = model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
                         -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
-                        -pred_degree_type, data=train)
-library(plm)
-detect.lindep(X)
+                        -pred_degree_type-highest_degree, data=train)
+
 set.seed(704)
 getit <- train(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                         -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
@@ -211,6 +211,12 @@ getit <- train(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
                                       returnResamp='all',
                                       selectionFunction='oneSE'))
 coef(getit$finalModel, id=5)
+stepwise.model = lm(log(early_career_pay) ~ make_world_better_percent +
+                      stem_percent + avg_fac_salary + pct_pell + median_hh_income,
+                    data=train)
+plot(stepwise.model)
+stepwise.preds = predict(stepwise.model, newdata = test)
+stepwise.rmspe = RMSE(stepwise.preds, log(test$early_career_pay))
 ```
 
 ```{r}
@@ -236,6 +242,55 @@ cv.lasso <- cv.glmnet(X, log(train$early_career_pay), alpha=1)
 plot(cv.lasso)
 lambda.lasso.chosen <- cv.lasso$lambda.1se
 coef(fit.lasso, s=lambda.lasso.chosen)
+X.test.lasso = model.matrix(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type-highest_degree, data=test)[,-1]
+coef(fit.lasso, s=lambda.lasso.chosen)
+lasso.preds = predict(fit.lasso, s=lambda.lasso.chosen, newx=X.test.lasso)
+lasso.rmspe = RMSE(lasso.preds, log(test$early_career_pay))
+```
+
+```{r}
+## lasso looks good but somethings up with these two...
+# PCR
+library(pls)
+set.seed(704)
+fit.pcr = pcr(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type-highest_degree,
+              data=train,
+              scale=TRUE,
+              validation = "CV",
+              segments=10,
+              segment.type='random'
+)
+par(mar=c(5.1, 4.1, 4.1, 7), xpd=T)
+coefplot(fit.pcr,separate=FALSE, ncomp=1:5)
+legend('right', col=1:5, lty=1:2,
+legend=c("1 comp", "2 comp", "3 comp", "4 comp", "5 comp"),
+bg='white', inset=c(-0.4,0))
+ncomp.pcr1se = selectNcomp(fit.pcr,method="onesigma",plot=TRUE)
+pcr.preds = predict(fit.pcr, newdata=test, ncomp=ncomp.pcr1se)
+pcr.rmsep = RMSE(pcr.preds, log(test$early_career_pay))
+
+# PLS
+set.seed(704)
+fit.pls = plsr(log(early_career_pay) ~ . -name-state-mid_career_pay-state_code
+                        -`Total Minority`-out_of_state_total-`Non-Resident Foreign`
+                        -in_state_total-region-Black-in_state_tuition-rank-poverty_rate
+                        -pred_degree_type-highest_degree,
+              data=train,
+              scale=TRUE,
+              validation = "CV",
+              segments=10,
+              segment.type='random',
+              method='simpls'
+)
+ncomp.pls1se = selectNcomp(fit.pls,method="onesigma",plot=TRUE)
+pls.preds = predict(fit.pls, newdata=test, ncomp=ncomp.pls1se)
+pls.rmsep = RMSE(pls.preds, log(test$early_career_pay))
 ```
 
 For the report/supplemental:
