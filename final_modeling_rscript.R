@@ -19,7 +19,7 @@ load('data/test.RData')
 # EDA ----
 ## Fit base linear model with multicollinearity fixed
 base.model <- lm(early_career_pay ~ . -name-state-mid_career_pay-state_code
-             -`Total Minority`-out_of_state_total-`Non-Resident Foreign`, 
+             -`Total Minority`-out_of_state_total-`Non-Resident Foreign`-ST_FIPS, 
              data = train)
 vifslm1 <- vif(base.model)
 vifs.base = vifslm1[order(vifslm1[,1],decreasing = T),]
@@ -49,7 +49,7 @@ boxTidwell(log(early_career_pay) ~ room_and_board + total_enrollment + ST_FIPS +
 transformed.lm = lm(log(early_career_pay) ~ degree_length + room_and_board +
                       out_of_state_tuition +
                       make_world_better_percent + stem_percent + degree_type +
-                      type_school + ST_FIPS + locale + hbcu + annhi + AANAPII +
+                      type_school + locale + hbcu + annhi + AANAPII +
                       his + nanti + men_only + women_only + admission_rate
                     + I(admission_rate^-1) + log(total_enrollment) +
                       sat_avg + distance_only + netprice_lowincome +
@@ -101,12 +101,16 @@ stepwise.model = lm(log(early_career_pay) ~ sat_avg +
                       I(pct_domestic^4),
                     data=train.without.outliers)
 summary(stepwise.model)
+lm.beta.model <- lm.beta(stepwise.model)
+xtable::xtable(lm.beta.model)
+
 ## Verify that our model meets linear regression assumptions
 plot(stepwise.model)
 ## Calculate RMSEP based on test set
 stepwise.preds = predict(stepwise.model, newdata = test)
 stepwise.rmsep = RMSE(stepwise.preds, log(test$early_career_pay))
-
+stepwise.preds.train = predict(stepwise.model, newdata=train.without.outliers)
+RMSE(stepwise.preds.train, log(train.without.outliers$early_career_pay))
 # Fit LASSO Model ----
 ## Fit the lasso model
 X.lasso = model.matrix(model.without.outliers)[,-1]
@@ -133,6 +137,9 @@ lambda.lasso.chosen <- cv.lasso$lambda.1se
 coef(fit.lasso, s=lambda.lasso.chosen)
 coef(cv.lasso$glmnet.fit, s=lambda.lasso.chosen)
 X.test.lasso = model.matrix(model.formula, data=test)[,-1]
+lasso.train.preds = predict(fit.lasso, s=lambda.lasso.chosen,
+                            newx=X.lasso)
+lasso.rmse = RMSE(lasso.train.preds, log(train.without.outliers$early_career_pay))
 lasso.preds = predict(fit.lasso, s=lambda.lasso.chosen, newx=X.test.lasso)
 lasso.rmsep = RMSE(lasso.preds, log(test$early_career_pay))
 
@@ -150,4 +157,34 @@ ncomp.pls1se = selectNcomp(fit.pls,method="onesigma",plot=TRUE)
 pls.preds = predict(fit.pls, newdata=test, ncomp=ncomp.pls1se)
 pls.rmsep = RMSE(pls.preds, log(test$early_career_pay))
 
-# 
+# Fit GLM Model
+
+gamma.mod1 = glm(early_career_pay ~ sat_avg + stem_percent +
+      tuit_fte + avg_fac_salary + pct_pell + pct_domestic + 
+      I(pct_domestic^4), data=train.without.outliers,
+    family=Gamma(link = "log"))
+summary(gamma.mod1)
+
+plot(stepwise.model)
+
+glm.preds = predict(gamma.mod1, type='response', test)
+glm.train.preds = predict(gamma.mod1, type='response', train.without.outliers)
+RMSE(log(glm.preds), log(test$early_career_pay))
+RMSE(log(glm.train.preds), log(train.without.outliers$early_career_pay))
+plot(2*log(glm.train.preds), residuals.glm(gamma.mod1, type='deviance'),
+     xlab=expression(2*log(hat(mu))), ylab="Deviance Residuals",
+     main="Fitted vs. Deviance Residuals")
+zero.fn = function(x) {
+  return(x*0)
+}
+curve(zero.fn, from=20.9, to=23, add=TRUE, col='red')
+
+plot(log(train.without.outliers$early_career_pay), 
+     predict(gamma.mod1, type='link'),
+     xlab="Log of Early Career Pay",
+     ylab="Log-Link Predicted Values",
+     main="Check of Proper Link Function")
+abline(0,1, col='red')
+glm.summary = summary(gamma.mod1)
+glm.output <- lm.beta(gamma.mod1)
+xtable::xtable(glm.output)
