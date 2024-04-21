@@ -167,7 +167,18 @@ pls.preds = predict(fit.pls, newdata=test, ncomp=ncomp.pls1se)
 pls.rmsep = RMSE(pls.preds, log(test$early_career_pay))
 pls.rmse = RMSE(predict(fit.pls, newdata=train.without.outliers, ncomp=ncomp.pls1se),
                 log(train.without.outliers$early_career_pay))
+getScreePlot<-function(fit,label="PCR",suggested=1,...){
+  plot(cumsum(fit$Xvar / fit$Xtotvar),type="b",
+       xlab="NumberofComponents",ylab="%VarianceExplained",
+       main=paste0("ScreePlotfor ",label))
+  abline(h=0.5,col="red")
+  abline(h=0.7,col="blue")
+  abline(h=0.9,col="pink")
+  abline(v=suggested)
+  legend(x=12,y=0.45,legend= c("50%","70%","90%"),fill= c("red","blue","pink"))
+}
 
+getScreePlot(fit.pls, "PLSR", suggested = ncomp.pls1se)
 # Fit GLM Model
 
 gamma.mod1 = glm(early_career_pay ~ sat_avg + stem_percent +
