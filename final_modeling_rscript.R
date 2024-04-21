@@ -77,6 +77,11 @@ car::influencePlot(model.without.outliers)
 car::outlierTest(model.without.outliers, cutoff=.05, n.max=Inf)
 train.without.outliers = train[-c(444),]
 
+# OLS get RMSE as baseline
+round(abs(RMSE(predict(model.without.outliers, newdata=train.without.outliers),
+     log(train.without.outliers$early_career_pay)) - 
+RMSE(predict(model.without.outliers, newdata=test),
+     log(test$early_career_pay))),4)
 
 # Linear Regression with Stepwise Regression ----
 ## set seed and number of groups for CV
@@ -110,7 +115,7 @@ plot(stepwise.model)
 stepwise.preds = predict(stepwise.model, newdata = test)
 stepwise.rmsep = RMSE(stepwise.preds, log(test$early_career_pay))
 stepwise.preds.train = predict(stepwise.model, newdata=train.without.outliers)
-RMSE(stepwise.preds.train, log(train.without.outliers$early_career_pay))
+stepwise.rmse = RMSE(stepwise.preds.train, log(train.without.outliers$early_career_pay))
 # Fit LASSO Model ----
 ## Fit the lasso model
 X.lasso = model.matrix(model.without.outliers)[,-1]
@@ -134,7 +139,9 @@ cv.lasso <- cv.glmnet(X.lasso, log(train.without.outliers$early_career_pay),
                       alpha=1)
 plot(cv.lasso)
 lambda.lasso.chosen <- cv.lasso$lambda.1se
-coef(fit.lasso, s=lambda.lasso.chosen)
+lasso.coefs = coef(fit.lasso, s=lambda.lasso.chosen)
+lasso.coefs.table = data.frame(Variable = rownames(lasso.coefs)[(lasso.coefs@i + 1)], 
+                               Coefficient = lasso.coefs@x)
 coef(cv.lasso$glmnet.fit, s=lambda.lasso.chosen)
 X.test.lasso = model.matrix(model.formula, data=test)[,-1]
 lasso.train.preds = predict(fit.lasso, s=lambda.lasso.chosen,
@@ -142,7 +149,9 @@ lasso.train.preds = predict(fit.lasso, s=lambda.lasso.chosen,
 lasso.rmse = RMSE(lasso.train.preds, log(train.without.outliers$early_career_pay))
 lasso.preds = predict(fit.lasso, s=lambda.lasso.chosen, newx=X.test.lasso)
 lasso.rmsep = RMSE(lasso.preds, log(test$early_career_pay))
-
+round(lasso.rmsep - lasso.rmse, 4)
+knitr::kable(lasso.coefs.table, row.names = FALSE,
+             booktabs=TRUE, format='latex', digits=4)
 # Fit PLS Model ----
 set.seed(704)
 fit.pls = plsr(model.formula,
@@ -156,6 +165,8 @@ fit.pls = plsr(model.formula,
 ncomp.pls1se = selectNcomp(fit.pls,method="onesigma",plot=TRUE)
 pls.preds = predict(fit.pls, newdata=test, ncomp=ncomp.pls1se)
 pls.rmsep = RMSE(pls.preds, log(test$early_career_pay))
+pls.rmse = RMSE(predict(fit.pls, newdata=train.without.outliers, ncomp=ncomp.pls1se),
+                log(train.without.outliers$early_career_pay))
 
 # Fit GLM Model
 
@@ -164,8 +175,6 @@ gamma.mod1 = glm(early_career_pay ~ sat_avg + stem_percent +
       I(pct_domestic^4), data=train.without.outliers,
     family=Gamma(link = "log"))
 summary(gamma.mod1)
-
-plot(stepwise.model)
 
 glm.preds = predict(gamma.mod1, type='response', test)
 glm.train.preds = predict(gamma.mod1, type='response', train.without.outliers)
