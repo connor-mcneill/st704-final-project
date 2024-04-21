@@ -17,6 +17,12 @@ load('data/train.RData')
 load('data/test.RData')
 
 # EDA ----
+
+# Histogram of Early Career Pay
+hist(rbind(train, test)$early_career_pay, col="mediumpurple1",
+     main="Histogram of Early Career Pay by College",
+     xlab="Early Career Pay", border="black")
+
 ## Fit base linear model with multicollinearity fixed
 base.model <- lm(early_career_pay ~ . -name-state-mid_career_pay-state_code
              -`Total Minority`-out_of_state_total-`Non-Resident Foreign`-ST_FIPS, 
